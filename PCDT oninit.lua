@@ -1747,7 +1747,7 @@ PartyCooldownTracker.cds = {
             ["talentIndex"] = 27,
             ["cd"] = 45,
         },  
-        [47860] = {
+        [27223] = {
             ["cd"] = 120,
         }, 
         [17928] = {
