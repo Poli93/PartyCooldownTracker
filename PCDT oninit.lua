@@ -414,7 +414,7 @@ function PartyCooldownTracker:RemoveCooldownInfo(allstates, guid, spellID)
 end
 
 function PartyCooldownTracker:PetCooldownRemove(allstates, guid)
-    local update = false;
+    local update = falsel
     for petGUID, data in pairs(self.pet_roster) do
         if ( data.unitGUID == guid ) then
             for spellID in pairs(data.spells) do
@@ -469,11 +469,11 @@ function PartyCooldownTracker:UnitPetCDInit(allstates, unit)
 end
 
 local function GetTableSize(object)
-    local i = 0 ;
-    for _ in pairs(object) do
-        i = i + 1;
+    local t = {};
+    for _, v in pairs(object) do
+        tinsert(t, v);
     end
-    return i;
+    return #t;
 end
 
 local function ScheduleTimer(duration, unit, guid, nilchek)
@@ -558,7 +558,7 @@ function PartyCooldownTracker:UnitItemInit(allstates, unit, guid)
     return createFrames;
 end
 
-function PartyCooldownTracker:GenerationGlyphsRoster(object, unit)
+function PartyCooldownTracker:GlyphsRosterGeneration(object, unit)
     local active = self.libGT:GetActiveTalentGroup(unit);
     for i = 1, 6 do 
         local glyph = select(i, self.libGT:GetUnitGlyphs(unit, active));
@@ -572,7 +572,7 @@ end
 function PartyCooldownTracker:CheckTalents(allstates, unit, guid, createFrames)
     local update = createFrames;
     local class = self.roster[guid].class;
-    local glyphs = self:GenerationGlyphsRoster({}, unit);
+    local glyphs = self:GlyphsRosterGeneration({}, unit);
     
     for spellID, data in pairs(self.cds[class]) do
         if ( data.display and (data.tReq or data.minus or data.glyph) ) then   
@@ -627,7 +627,7 @@ function PartyCooldownTracker:UnitCooldownsInit(allstates, unit, guid)
     local race = self.roster[guid].race;
     local check = false;
     local createFrames = false;
-
+    
     for spellID, data in pairs(self.cds[class]) do
         if ( data.display ) then
             if ( not data.tReq ) then
@@ -658,16 +658,16 @@ function PartyCooldownTracker:UnitCooldownsInit(allstates, unit, guid)
     return createFrames;
 end
 
-function PartyCooldownTracker:GenerationRoster(unit)
+function PartyCooldownTracker:RosterGeneration(unit, guid, unitClass, faction, race, unitName)
     return { 
         spells = {}, 
         trinkets = {}, 
         pet = {},
         unitID = unit, 
-        class =  select(2, UnitClass(unit)), 
-        faction = UnitFactionGroup(unit), 
-        race = select(2, UnitRace(unit)), 
-        unitName = UnitName(unit),
+        class = unitClass, 
+        faction = faction, 
+        race = race, 
+        unitName = unitName,
     };
 end
 
@@ -688,15 +688,22 @@ function PartyCooldownTracker:InitNewMembers(allstates)
     
     for i = 1, self:GetNumPartyMembers() do
         local unit = "party"..i;
+        local unitName = UnitName(unit);
+        local faction = UnitFactionGroup(unit) ; 
+        local _, race = UnitRace(unit);
         local guid = UnitGUID(unit);
-        local _, class = UnitClass(unit);
-        if ( not self.roster[guid] and self.cds[class] ) then
-            self.roster[guid] = self:GenerationRoster(unit);
-            if ( self:UnitPetCDInit(allstates, unit) ) then
-                updateFrames = true;
-            end
-            if ( self:UnitCooldownsInit(allstates, unit, guid) ) then
-                updateFrames = true;
+        local _, unitClass = UnitClass(unit);
+        
+        if ( unitName ~= _G.UNKNOWNOBJECT and not self.roster[guid] ) then
+            if ( self.cds[unitClass] ) then
+                self.roster[guid] = self:RosterGeneration(unit, guid, unitClass, faction, race, unitName);
+                
+                if ( self:UnitPetCDInit(allstates, unit) ) then
+                    updateFrames = true;
+                end
+                if ( self:UnitCooldownsInit(allstates, unit, guid) ) then
+                    updateFrames = true;
+                end
             end
         end
     end
@@ -804,16 +811,16 @@ local function setIconPosition(self, state, rowIdx)
             local height, width = region:GetHeight() + self.spacing, region:GetWidth() + self.spacing;
             local delta = self.auraCount[state.unitID].delta;
             
-            if ( config.direction == 1 ) then -- Влево, затем вниз
+            if ( config.direction == 1 ) then -- ?????, ????? ????
                 yoffset = yoffset - (order * height);
                 xoffset = xoffset - (rowIdx - delta) * width;
-            elseif ( config.direction == 2 ) then -- Вправо, затем вниз
+            elseif ( config.direction == 2 ) then -- ??????, ????? ????
                 yoffset = yoffset - (order * height);
                 xoffset = xoffset + (rowIdx - delta) * width;
-            elseif ( config.direction == 3 ) then -- Влево, затем вверх
+            elseif ( config.direction == 3 ) then -- ?????, ????? ?????
                 yoffset = yoffset + (order * height);
                 xoffset = xoffset - (rowIdx - delta) * width;
-            elseif ( config.direction == 4 ) then  -- Вправо, затем вверх
+            elseif ( config.direction == 4 ) then  -- ??????, ????? ?????
                 yoffset = yoffset + (order * height);
                 xoffset = xoffset + (rowIdx - delta) * width;
             end
@@ -839,8 +846,8 @@ function PartyCooldownTracker:sort(allstates)
             t[#t+1] = state;
         end
     end
-    table.sort(t, function (a,b)
-        return ( a.spellID > b.spellID );
+    table.sort(t, function (a,b)     
+            return ( a.spellID > b.spellID ) 
     end)
     
     return t;
@@ -860,14 +867,13 @@ PartyCooldownTracker.updateFrames = function(self, allstates)
     end
 end
 
-do
-    local timer;
-    function PartyCooldownTracker:scheduleUpdateFrames(allstates, duration)
-        if ( timer ) then WeakAuras.timer:CancelTimer(timer); end
-        timer = WeakAuras.timer:ScheduleTimer(function()
-                self:updateFrames(allstates) end, duration
-            );
-    end 
+local timer;
+function PartyCooldownTracker:scheduleUpdateFrames(allstates, duration)
+    if ( timer ) then WeakAuras.timer:CancelTimer(timer); end
+    timer = WeakAuras.timer:ScheduleTimer(function()
+            self:updateFrames(allstates) end, 
+        duration
+    );
 end
 
 PartyCooldownTracker.Events = {};
@@ -875,11 +881,9 @@ function PartyCooldownTracker:scheduleUpdateEvent(event, duration, ...)
     if ( ( not event ) or (not duration ) ) then
         return
     end
-    if ( self.Events[event] ) then
-        self.Events[event] = WeakAuras.timer:CancelTimer(self.Events[event]);
-    end
-
-    self.Events[event] = WeakAuras.timer:ScheduleTimer(WeakAuras.ScanEvents, duration, event, ...);
+    if ( self.Events[event] ) then self.Events[event] = WeakAuras.timer:CancelTimer(self.Events[event]); end
+    self.Events[event] = WeakAuras.timer:ScheduleTimer(WeakAuras.ScanEvents, 
+    duration, event, ...);
 end 
 
 PartyCooldownTracker.cds = {
@@ -1923,23 +1927,23 @@ PartyCooldownTracker.refresh = {
 
 PartyCooldownTracker.anyCDs = {
     -- spellID                itemID/race                          
-    [42292] = {["cd"] = 120, ["trinket"] = {51377, 51378, 46082}}, -- Медальон Альянса\Орды
-    [71607] = {["cd"] = 120, ["trinket"] = {50726, 50354}}, -- Подвеска истинной крови
-    [71586] = {["cd"] = 120, ["trinket"] = 50356}, -- Проржавевший костяной ключ
-    [71638] = {["cd"] = 60,  ["trinket"] = 50364}, -- Безупречный клык Синдрагосы
-    [75490] = {["cd"] = 120, ["trinket"] = 54573}, -- Светящаяся сумеречная чешуя
-    [67596] = {["cd"] = 120, ["trinket"] = {42137, 42136, 42135, 42134, 42133}}, -- Ярость/Точность/Бодрость/Неистовство/Опустошение военачальника
+    [42292] = {["cd"] = 120, ["trinket"] = {51377, 51378, 46082}}, -- ???????? ???????\????
+    [71607] = {["cd"] = 120, ["trinket"] = {50726, 50354}}, -- ???????? ???????? ?????
+    [71586] = {["cd"] = 120, ["trinket"] = 50356}, -- ???????????? ???????? ????
+    [71638] = {["cd"] = 60,  ["trinket"] = 50364}, -- ??????????? ???? ??????????
+    [75490] = {["cd"] = 120, ["trinket"] = 54573}, -- ?????????? ?????????? ?????
+    [67596] = {["cd"] = 120, ["trinket"] = {42137, 42136, 42135, 42134, 42133}}, -- ??????/????????/????????/???????????/??????????? ?????????????
     
-    [59752] = {["cd"] = 120, ["race"] = "Human"}, -- Каждый за себя
-    [58984] = {["cd"] = 120, ["race"] = "NightElf"}, -- Слиться с тенью
-    [59547] = {["cd"] = 180, ["race"] = "Draenei"}, -- Дар наару
-    [20594] = {["cd"] = 120, ["race"] = "Dwarf"}, -- Каменная форма
-    [20589] = {["cd"] = 95,  ["race"] = "Gnome"}, -- Мастер побега
-    [20572] = {["cd"] = 120, ["race"] = "Orc"}, -- Кровавое неистовство
-    [7744]  = {["cd"] = 120, ["race"] = "Scourge"}, -- Воля Отрекшихся
-    [20549] = {["cd"] = 120, ["race"] = "Tauren"}, -- Громовая поступь
-    [26297] = {["cd"] = 180, ["race"] = "Troll"}, -- Берсерк
-    [28730] = {["cd"] = 120, ["race"] = "BloodElf"}  -- Волшебный поток
+    [59752] = {["cd"] = 120, ["race"] = "Human"}, -- ?????? ?? ????
+    [58984] = {["cd"] = 120, ["race"] = "NightElf"}, -- ??????? ? ?????
+    [59547] = {["cd"] = 180, ["race"] = "Draenei"}, -- ??? ?????
+    [20594] = {["cd"] = 120, ["race"] = "Dwarf"}, -- ???????? ?????
+    [20589] = {["cd"] = 95,  ["race"] = "Gnome"}, -- ?????? ??????
+    [20572] = {["cd"] = 120, ["race"] = "Orc"}, -- ???????? ???????????
+    [7744]  = {["cd"] = 120, ["race"] = "Scourge"}, -- ???? ??????????
+    [20549] = {["cd"] = 120, ["race"] = "Tauren"}, -- ???????? ???????
+    [26297] = {["cd"] = 180, ["race"] = "Troll"}, -- ???????
+    [28730] = {["cd"] = 120, ["race"] = "BloodElf"}  -- ????????? ?????
 };
 
 if ( config.ANY ) then
@@ -2008,20 +2012,20 @@ PartyCooldownTracker.relationship = {
 
 local L = {};
 if GetLocale() == "ruRU" then
-    L["Felhunter"] = "Охотник Скверны"
-    L["Voidwalker"] = "Демон Бездны"
-    L["Ghoul"] = "Вурдалак"
-    L["Spider"] = "Паук"
-    L["Crab"] = "Краб"
-    L["Wolf"] = "Волк"
-    L["Worm"] = "Червь"   
-    L["Chimaera"] = "Химера"
-    L["Gorilla"] = "Горилла"
-    L["Turtle"] = "Черепаха"
-    L["Spirit Beast"] = "Дух зверя"
-    L["Core Hound"] = "Гончая Недр"
-    L["Bat"] = "Летучая мышь"
-    L["Ravager"] = "Опустошитель"
+    L["Felhunter"] = "??????? ???????"
+    L["Voidwalker"] = "????? ??????"
+    L["Ghoul"] = "????????"
+    L["Spider"] = "????"
+    L["Crab"] = "????"
+    L["Wolf"] = "????"
+    L["Worm"] = "?????"   
+    L["Chimaera"] = "??????"
+    L["Gorilla"] = "???????"
+    L["Turtle"] = "????????"
+    L["Spirit Beast"] = "??? ?????"
+    L["Core Hound"] = "?????? ????"
+    L["Bat"] = "??????? ????"
+    L["Ravager"] = "????????????"
 else
     L["Felhunter"] = "Felhunter"
     L["Voidwalker"] = "Voidwalker"
@@ -2111,9 +2115,10 @@ end
 --------------------------------------------------------------------------------------------------------
 -- blacklist for CLUE:SPELL_CAST_SUCCESS
 PartyCooldownTracker.blacklist = {
-    [57934] = true, -- Маленькие хитрости
-    [34477] = true, -- Перенаправление
-    [14751] = true, -- Внутреннее сосредоточение
-    [46584] = true, -- Воскрешение мертвых
-    [20216] = true, -- Божественное одобрение
+    [57934] = true, -- ????????? ????????
+    [34477] = true, -- ???????????????
+    [14751] = true, -- ?????????? ??????????????
+    [46584] = true, -- ??????????? ???????
+    [20216] = true, -- ???????????? ?????????
 };
+
